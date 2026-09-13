@@ -85,6 +85,8 @@ export function getFirebaseErrorMessage(error: any): string {
       return 'Too many unsuccessful attempts. Please try again after a few minutes.';
     case 'auth/user-disabled':
       return 'This user account has been disabled. Please contact support.';
+    case 'auth/unauthorized-domain':
+      return `Domain unauthorized (${typeof window !== 'undefined' ? window.location.hostname : 'current domain'}). Please add this domain to Firebase Console > Authentication > Settings > Authorized Domains.`;
     case 'auth/api-key-not-valid.please-pass-a-valid-api-key':
     case 'auth/api-key-not-valid-please-pass-a-valid-api-key':
       return 'Firebase API key is invalid. Please check your API key configuration.';
