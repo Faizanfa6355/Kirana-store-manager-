@@ -18,6 +18,7 @@ import { Product, STORE_CATEGORIES, UnitType } from '../types.js';
 import { useStore } from '../context/StoreContext.js';
 import { api } from '../api/client.js';
 import { BarcodeScannerModal } from '../components/BarcodeScannerModal.js';
+import { NativeAd } from '../components/NativeAd.js';
 
 interface ProductsViewProps {
   isAddModalOpen?: boolean;
@@ -304,6 +305,9 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Native In-Feed Sponsored Ad */}
+      <NativeAd className="mb-1" />
 
       {/* Products List Cards */}
       {filteredProducts.length === 0 ? (

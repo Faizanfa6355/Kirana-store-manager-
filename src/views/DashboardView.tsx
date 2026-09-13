@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext.js';
 import { ActiveTab } from '../types.js';
+import { NativeAd } from '../components/NativeAd.js';
 
 interface DashboardViewProps {
   onNavigate: (tab: ActiveTab) => void;
@@ -222,6 +223,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <p className="text-[11px] text-rose-700 dark:text-rose-400 mt-1">Customer balance</p>
         </div>
       </div>
+
+      {/* Google Native Ad Placement */}
+      <NativeAd className="my-3" />
 
       {/* Recent Transactions List */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs border border-slate-200/80 dark:border-slate-800">

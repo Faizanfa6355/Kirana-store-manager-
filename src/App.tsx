@@ -17,6 +17,7 @@ import { ExpensesView } from './views/ExpensesView.js';
 import { ReportsView } from './views/ReportsView.js';
 import { SettingsView } from './views/SettingsView.js';
 import { AdminDashboardView } from './views/AdminDashboardView.js';
+import { BannerAd } from './components/BannerAd.js';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -118,6 +119,9 @@ const AppContent: React.FC = () => {
         {activeTab === 'admin' && (
           <AdminDashboardView onNavigateToUserStore={(tab) => setActiveTab(tab)} />
         )}
+
+        {/* Google AdMob / AdSense Banner Ad */}
+        <BannerAd className="mt-6" />
       </main>
 
       {/* Bottom Navigation */}

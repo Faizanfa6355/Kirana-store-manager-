@@ -43,6 +43,13 @@ async function startServer() {
   // Store Routes
   app.use('/api/store', storeRouter);
 
+  // Google Ads / AdMob Verification (ads.txt and app-ads.txt)
+  const adsTxtContent = 'google.com, pub-9299132994586276, DIRECT, f08c47fec0942fa0\n';
+  app.get(['/ads.txt', '/app-ads.txt'], (req, res) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(adsTxtContent);
+  });
+
   // Vite middleware for development / static serving in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

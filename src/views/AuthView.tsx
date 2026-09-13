@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../context/AuthContext.js';
 import { useStore } from '../context/StoreContext.js';
 import { AdminLoginView } from '../components/AdminLoginView.js';
+import { BannerAd } from '../components/BannerAd.js';
 import { ShieldAlert } from 'lucide-react';
 
 const GoogleIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
@@ -423,6 +424,11 @@ export const AuthView: React.FC = () => {
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
           <span>Secured by Firebase Authentication & Firestore</span>
         </div>
+      </div>
+
+      {/* Google Ad Banner */}
+      <div className="w-full max-w-md">
+        <BannerAd />
       </div>
     </div>
   );
