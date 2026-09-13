@@ -1,0 +1,142 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "fullName", "email"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Kirana store product item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "currentStock": { "type": "number" },
+        "minStockAlert": { "type": "number" },
+        "barcode": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "unit", "costPrice", "sellingPrice", "currentStock"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Point-of-sale invoice record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "date": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paymentMode": { "type": "string" },
+        "amountPaid": { "type": "number" },
+        "amountDue": { "type": "number" }
+      },
+      "required": ["id", "invoiceNumber", "date", "items", "totalAmount", "paymentMode"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Stock-in purchase from supplier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "billNumber": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "date": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "amountPaid": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "date", "items", "totalAmount"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Store customer and khata ledger",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "creditBalance": { "type": "number" },
+        "totalPurchases": { "type": "number" },
+        "lastVisit": { "type": "string" }
+      },
+      "required": ["id", "name", "creditBalance"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Distributor or vendor record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "companyName": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "pendingBalance": { "type": "number" },
+        "totalSupplied": { "type": "number" }
+      },
+      "required": ["id", "name", "pendingBalance"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Store operating expense",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentMode": { "type": "string" }
+      },
+      "required": ["id", "date", "category", "title", "amount"]
+    },
+    "CreditTransaction": {
+      "title": "Credit Transaction",
+      "description": "Khata debit/credit ledger transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "partyId": { "type": "string" },
+        "partyType": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "balanceAfter": { "type": "number" },
+        "note": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "partyId", "partyType", "type", "amount", "date"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "UserProfile",
+      "description": "User account profiles"
+    },
+    "stores": {
+      "description": "Isolated per-user store collections including products, sales, purchases, customers, suppliers, expenses, and creditTransactions"
+    }
+  }
+}

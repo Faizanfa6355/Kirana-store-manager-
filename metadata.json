@@ -1,0 +1,10 @@
+{
+  "name": "Kirana Store Management",
+  "description": "A professional, modern, mobile-friendly Kirana store and grocery shop management system with fast billing, inventory, udhaar credit, purchases, reports, and expenses.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
