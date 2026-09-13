@@ -7,26 +7,38 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper to verify the user owns the document by Firebase UID
+    // Helper to check if current user is the designated admin
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'fa635588@gmail.com' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    // Helper to verify the user owns the document by Firebase UID or is admin
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // User Profile: strictly isolated by UID
+    // User Profile: owners can read/write their own profile; admin can read/manage all user profiles
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
     }
 
     // Store data: products, sales, purchases, customers, suppliers, expenses, settings, creditTransactions
     match /stores/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
 
       match /{subcollection}/{docId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
       }
 
       match /{subcollection}/{docId}/{subPath=**} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
       }
     }
 

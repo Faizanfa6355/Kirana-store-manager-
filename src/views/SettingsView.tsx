@@ -18,7 +18,7 @@ import { useStore } from '../context/StoreContext.js';
 import { api } from '../api/client.js';
 
 export const SettingsView: React.FC = () => {
-  const { user, settings, updateSettings, logout, sendResetEmail } = useAuth();
+  const { user, settings, updateSettings, logout, sendResetEmail, isAdmin } = useAuth();
   const { showToast } = useStore();
 
   const [formData, setFormData] = useState({
@@ -285,9 +285,16 @@ export const SettingsView: React.FC = () => {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-              {user?.fullName || user?.name || 'Shopkeeper'}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                {user?.fullName || user?.name || 'Shopkeeper'}
+              </h3>
+              {isAdmin && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] font-black uppercase tracking-wider border border-amber-300 dark:border-amber-800">
+                  Admin
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
               {user?.email || 'No email attached'}
             </p>

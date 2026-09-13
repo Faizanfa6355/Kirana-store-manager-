@@ -230,6 +230,33 @@ export interface ReportsData {
   }>;
 }
 
+export interface RegisteredUser {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  storeName?: string;
+  profilePhoto?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  disabled?: boolean;
+}
+
+export interface AdminOverviewStats {
+  totalUsers: number;
+  totalProducts: number;
+  totalSales: number;
+  totalPurchases: number;
+  totalCustomers: number;
+  totalSuppliers: number;
+  totalExpenses: number;
+  totalSalesRevenue: number;
+  totalPurchasesCost: number;
+  totalExpensesAmount: number;
+  totalCreditOutstanding: number;
+}
+
 export type ActiveTab =
   | 'dashboard'
   | 'products'
@@ -242,4 +269,5 @@ export type ActiveTab =
   | 'udhaar'
   | 'expenses'
   | 'reports'
-  | 'settings';
+  | 'settings'
+  | 'admin';

@@ -25,6 +25,8 @@ import {
   StoreSettings,
   DashboardStats,
   ReportsData,
+  RegisteredUser,
+  AdminOverviewStats,
 } from '../types.js';
 
 function getUid(): string {
@@ -1003,4 +1005,234 @@ export async function getReportsData(): Promise<ReportsData> {
     topPayables,
     expensesByCategory,
   };
+}
+
+// ==================== ADMIN OPERATIONS ====================
+
+export const ADMIN_EMAIL_ADDRESS = 'fa635588@gmail.com';
+
+export function verifyAdminAccess(): void {
+  const user = auth.currentUser;
+  if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL_ADDRESS.toLowerCase()) {
+    throw new Error('Access denied. Admin account required.');
+  }
+}
+
+/**
+ * Fetch all registered users from Firestore /users collection
+ */
+export async function getAdminAllUsers(): Promise<RegisteredUser[]> {
+  verifyAdminAccess();
+  const usersRef = collection(db, 'users');
+  const snap = await getDocs(usersRef);
+  const users: RegisteredUser[] = snap.docs.map((docSnap) => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      userId: data.userId || docSnap.id,
+      fullName: data.fullName || 'Shopkeeper',
+      email: data.email || '',
+      phone: data.phone || '',
+      storeName: data.storeName || 'My Kirana Store',
+      profilePhoto: data.profilePhoto || null,
+      createdAt: data.createdAt || new Date().toISOString(),
+      updatedAt: data.updatedAt || new Date().toISOString(),
+      disabled: Boolean(data.disabled),
+    };
+  });
+
+  // Sort by createdAt desc
+  users.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return users;
+}
+
+/**
+ * Update user status or details as admin
+ */
+export async function updateAdminUser(
+  userId: string,
+  updates: Partial<RegisteredUser>
+): Promise<void> {
+  verifyAdminAccess();
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Delete a user profile and their store data
+ */
+export async function deleteAdminUser(userId: string): Promise<void> {
+  verifyAdminAccess();
+  const userRef = doc(db, 'users', userId);
+  await deleteDoc(userRef);
+}
+
+/**
+ * Fetch all data for all users or a specific user for admin review
+ */
+export async function getAdminStoreData(targetUserId?: string): Promise<{
+  products: Product[];
+  sales: Sale[];
+  purchases: Purchase[];
+  customers: Customer[];
+  suppliers: Supplier[];
+  expenses: Expense[];
+  stats: AdminOverviewStats;
+}> {
+  verifyAdminAccess();
+  const allUsers = await getAdminAllUsers();
+  const uidsToQuery = targetUserId
+    ? [targetUserId]
+    : allUsers.map((u) => u.userId);
+
+  // If no users exist, return empty
+  if (uidsToQuery.length === 0) {
+    return {
+      products: [],
+      sales: [],
+      purchases: [],
+      customers: [],
+      suppliers: [],
+      expenses: [],
+      stats: {
+        totalUsers: 0,
+        totalProducts: 0,
+        totalSales: 0,
+        totalPurchases: 0,
+        totalCustomers: 0,
+        totalSuppliers: 0,
+        totalExpenses: 0,
+        totalSalesRevenue: 0,
+        totalPurchasesCost: 0,
+        totalExpensesAmount: 0,
+        totalCreditOutstanding: 0,
+      },
+    };
+  }
+
+  const allProducts: Product[] = [];
+  const allSales: Sale[] = [];
+  const allPurchases: Purchase[] = [];
+  const allCustomers: Customer[] = [];
+  const allSuppliers: Supplier[] = [];
+  const allExpenses: Expense[] = [];
+
+  // Query each store collection
+  for (const uid of uidsToQuery) {
+    try {
+      const [prodSnap, saleSnap, purchSnap, custSnap, suppSnap, expSnap] = await Promise.all([
+        getDocs(collection(db, 'stores', uid, 'products')),
+        getDocs(collection(db, 'stores', uid, 'sales')),
+        getDocs(collection(db, 'stores', uid, 'purchases')),
+        getDocs(collection(db, 'stores', uid, 'customers')),
+        getDocs(collection(db, 'stores', uid, 'suppliers')),
+        getDocs(collection(db, 'stores', uid, 'expenses')),
+      ]);
+
+      prodSnap.docs.forEach((d) => allProducts.push({ ...(d.data() as Product), id: d.id, userId: uid }));
+      saleSnap.docs.forEach((d) => allSales.push({ ...(d.data() as Sale), id: d.id, userId: uid }));
+      purchSnap.docs.forEach((d) => allPurchases.push({ ...(d.data() as Purchase), id: d.id, userId: uid }));
+      custSnap.docs.forEach((d) => allCustomers.push({ ...(d.data() as Customer), id: d.id, userId: uid }));
+      suppSnap.docs.forEach((d) => allSuppliers.push({ ...(d.data() as Supplier), id: d.id, userId: uid }));
+      expSnap.docs.forEach((d) => allExpenses.push({ ...(d.data() as Expense), id: d.id, userId: uid }));
+    } catch (storeErr) {
+      console.warn(`Could not read store data for ${uid}:`, storeErr);
+    }
+  }
+
+  // Sort
+  allSales.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+  allPurchases.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+  allExpenses.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+  allProducts.sort((a, b) => a.name.localeCompare(b.name));
+
+  const totalSalesRevenue = allSales.reduce((acc, s) => acc + (s.grandTotal || 0), 0);
+  const totalPurchasesCost = allPurchases.reduce((acc, p) => acc + (p.totalAmount || 0), 0);
+  const totalExpensesAmount = allExpenses.reduce((acc, e) => acc + (e.amount || 0), 0);
+  const totalCreditOutstanding = allCustomers.reduce((acc, c) => acc + (c.creditBalance || 0), 0);
+
+  const stats: AdminOverviewStats = {
+    totalUsers: allUsers.length,
+    totalProducts: allProducts.length,
+    totalSales: allSales.length,
+    totalPurchases: allPurchases.length,
+    totalCustomers: allCustomers.length,
+    totalSuppliers: allSuppliers.length,
+    totalExpenses: allExpenses.length,
+    totalSalesRevenue,
+    totalPurchasesCost,
+    totalExpensesAmount,
+    totalCreditOutstanding,
+  };
+
+  return {
+    products: allProducts,
+    sales: allSales,
+    purchases: allPurchases,
+    customers: allCustomers,
+    suppliers: allSuppliers,
+    expenses: allExpenses,
+    stats,
+  };
+}
+
+/**
+ * Admin delete product across any store
+ */
+export async function deleteProductAsAdmin(userId: string, productId: string): Promise<void> {
+  verifyAdminAccess();
+  const ref = doc(db, 'stores', userId, 'products', productId);
+  await deleteDoc(ref);
+}
+
+/**
+ * Admin update product across any store
+ */
+export async function updateProductAsAdmin(
+  userId: string,
+  productId: string,
+  updates: Partial<Product>
+): Promise<void> {
+  verifyAdminAccess();
+  const ref = doc(db, 'stores', userId, 'products', productId);
+  await setDoc(ref, { ...updates, updatedAt: new Date().toISOString() }, { merge: true });
+}
+
+/**
+ * Admin delete sale
+ */
+export async function deleteSaleAsAdmin(userId: string, saleId: string): Promise<void> {
+  verifyAdminAccess();
+  const ref = doc(db, 'stores', userId, 'sales', saleId);
+  await deleteDoc(ref);
+}
+
+/**
+ * Admin delete customer
+ */
+export async function deleteCustomerAsAdmin(userId: string, customerId: string): Promise<void> {
+  verifyAdminAccess();
+  const ref = doc(db, 'stores', userId, 'customers', customerId);
+  await deleteDoc(ref);
+}
+
+/**
+ * Admin delete supplier
+ */
+export async function deleteSupplierAsAdmin(userId: string, supplierId: string): Promise<void> {
+  verifyAdminAccess();
+  const ref = doc(db, 'stores', userId, 'suppliers', supplierId);
+  await deleteDoc(ref);
+}
+
+/**
+ * Admin delete expense
+ */
+export async function deleteExpenseAsAdmin(userId: string, expenseId: string): Promise<void> {
+  verifyAdminAccess();
+  const ref = doc(db, 'stores', userId, 'expenses', expenseId);
+  await deleteDoc(ref);
 }

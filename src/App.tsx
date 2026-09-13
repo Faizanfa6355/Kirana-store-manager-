@@ -16,6 +16,7 @@ import { UdhaarView } from './views/UdhaarView.js';
 import { ExpensesView } from './views/ExpensesView.js';
 import { ReportsView } from './views/ReportsView.js';
 import { SettingsView } from './views/SettingsView.js';
+import { AdminDashboardView } from './views/AdminDashboardView.js';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -113,6 +114,10 @@ const AppContent: React.FC = () => {
         {activeTab === 'reports' && <ReportsView />}
 
         {activeTab === 'settings' && <SettingsView />}
+
+        {activeTab === 'admin' && (
+          <AdminDashboardView onNavigateToUserStore={(tab) => setActiveTab(tab)} />
+        )}
       </main>
 
       {/* Bottom Navigation */}

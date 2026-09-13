@@ -19,13 +19,17 @@ import {
   seedStarterProductsIfEmpty,
 } from '../services/firestoreService.js';
 
+export const ADMIN_EMAIL = 'fa635588@gmail.com';
+
 interface AuthContextType {
   user: User | null;
   firebaseUser: FirebaseUser | null;
   settings: StoreSettings | null;
   loading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
+  loginAsAdmin: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (fullName: string, email: string, pass: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   sendResetEmail: (email: string) => Promise<void>;
@@ -163,6 +167,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // 1b. Dedicated Admin Login
+  const loginAsAdmin = async (email: string, pass: string) => {
+    try {
+      const trimmedEmail = email.trim().toLowerCase();
+      if (trimmedEmail !== ADMIN_EMAIL.toLowerCase()) {
+        throw new Error('Access denied. Admin account required.');
+      }
+
+      const cred = await signInWithEmailAndPassword(auth, trimmedEmail, pass);
+      const signedEmail = (cred.user.email || '').trim().toLowerCase();
+      if (signedEmail !== ADMIN_EMAIL.toLowerCase()) {
+        await signOut(auth);
+        setFirebaseUser(null);
+        setUser(null);
+        throw new Error('Access denied. Admin account required.');
+      }
+
+      setFirebaseUser(cred.user);
+      const baseUser: User = {
+        id: cred.user.uid,
+        userId: cred.user.uid,
+        name: cred.user.displayName || 'System Administrator',
+        fullName: cred.user.displayName || 'System Administrator',
+        email: cred.user.email || ADMIN_EMAIL,
+        profilePhoto: cred.user.photoURL || null,
+        storeName: 'Admin Control Center',
+      };
+      setUser(baseUser);
+
+      // Sync admin user profile in Firestore
+      syncUserData(cred.user).catch((err) => {
+        console.warn('Admin user profile sync note:', err);
+      });
+    } catch (err: any) {
+      throw new Error(getFirebaseErrorMessage(err));
+    }
+  };
+
   // 2. Email & Password Sign Up
   const signUpWithEmail = async (fullName: string, email: string, pass: string) => {
     try {
@@ -289,6 +331,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAuthenticated = Boolean(firebaseUser || user);
+  const currentEmail = (firebaseUser?.email || user?.email || '').trim().toLowerCase();
+  const isAdmin = currentEmail === ADMIN_EMAIL.toLowerCase();
 
   return (
     <AuthContext.Provider
@@ -298,7 +342,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         settings,
         loading,
         isAuthenticated,
+        isAdmin,
         loginWithEmail,
+        loginAsAdmin,
         signUpWithEmail,
         loginWithGoogle,
         sendResetEmail,

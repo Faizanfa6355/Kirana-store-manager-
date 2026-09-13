@@ -1,5 +1,5 @@
 import React from 'react';
-import { Store, LogOut, Sun, Moon, RefreshCw, UserCheck } from 'lucide-react';
+import { Store, LogOut, Sun, Moon, RefreshCw, UserCheck, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 import { useStore } from '../context/StoreContext.js';
 
@@ -22,10 +22,10 @@ export const Header: React.FC<HeaderProps> = ({
   setDarkMode,
   onOpenSettings,
 }) => {
-  const { user, settings, logout } = useAuth();
+  const { user, settings, logout, isAdmin } = useAuth();
   const { refreshAll, loading } = useStore();
 
-  const storeDisplayName = settings?.storeName || user?.storeName || 'Kirana Store';
+  const storeDisplayName = isAdmin ? 'Admin Control Center' : (settings?.storeName || user?.storeName || 'Kirana Store');
 
   return (
     <header className="sticky top-0 z-30 bg-emerald-700 text-white shadow-md border-b border-emerald-800 transition-colors">
@@ -60,6 +60,23 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+
+          {/* Admin Switch Button */}
+          {isAdmin && onNavigate && (
+            <button
+              id="header-admin-panel-btn"
+              onClick={() => onNavigate('admin')}
+              title="Open Admin Panel"
+              className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+                activeTab === 'admin'
+                  ? 'bg-amber-400 text-amber-950 shadow-xs'
+                  : 'bg-emerald-800/90 text-amber-300 hover:bg-emerald-900'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Admin</span>
+            </button>
+          )}
 
           {/* Dark / Light toggle */}
           {setDarkMode && (

@@ -9,10 +9,12 @@ import {
   X,
   ChevronRight,
   ShieldCheck,
+  ShieldAlert,
   AlertCircle,
 } from 'lucide-react';
 import { ActiveTab } from '../types.js';
 import { useStore } from '../context/StoreContext.js';
+import { useAuth } from '../context/AuthContext.js';
 
 interface MoreMenuModalProps {
   isOpen: boolean;
@@ -28,10 +30,24 @@ export const MoreMenuModal: React.FC<MoreMenuModalProps> = ({
   activeTab,
 }) => {
   const { dashboardStats } = useStore();
+  const { isAdmin } = useAuth();
 
   if (!isOpen) return null;
 
   const menuItems = [
+    ...(isAdmin
+      ? [
+          {
+            id: 'admin' as ActiveTab,
+            title: 'Admin Panel',
+            subtitle: 'Global user management, data audits & controls',
+            icon: ShieldAlert,
+            badge: 'Admin Only',
+            badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+            color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50',
+          },
+        ]
+      : []),
     {
       id: 'customers' as ActiveTab,
       title: 'Customers',
