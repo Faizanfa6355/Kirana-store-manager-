@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSettings(storeSettings);
       return appUser;
     } catch (err) {
-      console.error('Failed to sync user data from Firestore:', err);
+      console.warn('Non-blocking user data sync notice:', err);
       // Fallback to basic profile so user is NEVER blocked from Dashboard
       const fallbackUser: User = {
         id: fbUser.uid,
@@ -330,7 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const isAuthenticated = Boolean(firebaseUser || user);
+  const isAuthenticated = Boolean(firebaseUser && user);
   const currentEmail = (firebaseUser?.email || user?.email || '').trim().toLowerCase();
   const isAdmin = currentEmail === ADMIN_EMAIL.toLowerCase();
 

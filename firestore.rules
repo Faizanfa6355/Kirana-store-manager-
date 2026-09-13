@@ -10,8 +10,8 @@ service cloud.firestore {
     // Helper to check if current user is the designated admin
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'fa635588@gmail.com' ||
-        request.auth.token.admin == true
+        ('email' in request.auth.token && request.auth.token.email == 'fa635588@gmail.com') ||
+        ('admin' in request.auth.token && request.auth.token.admin == true)
       );
     }
 
@@ -22,23 +22,19 @@ service cloud.firestore {
 
     // User Profile: owners can read/write their own profile; admin can read/manage all user profiles
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin();
+
+      match /{allPaths=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
     }
 
     // Store data: products, sales, purchases, customers, suppliers, expenses, settings, creditTransactions
     match /stores/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin();
 
-      match /{subcollection}/{docId} {
-        allow read: if isOwner(userId) || isAdmin();
-        allow write: if isOwner(userId) || isAdmin();
-      }
-
-      match /{subcollection}/{docId}/{subPath=**} {
-        allow read: if isOwner(userId) || isAdmin();
-        allow write: if isOwner(userId) || isAdmin();
+      match /{allPaths=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 

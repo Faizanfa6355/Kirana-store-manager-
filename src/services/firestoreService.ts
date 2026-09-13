@@ -29,12 +29,16 @@ import {
   AdminOverviewStats,
 } from '../types.js';
 
+function getCurrentUid(): string | null {
+  return auth.currentUser?.uid || null;
+}
+
 function getUid(): string {
-  const user = auth.currentUser;
-  if (!user) {
+  const uid = getCurrentUid();
+  if (!uid) {
     throw new Error('User not authenticated. Please log in.');
   }
-  return user.uid;
+  return uid;
 }
 
 // ==================== USER PROFILE ====================
@@ -90,7 +94,7 @@ export async function saveUserProfile(
 // ==================== STORE SETTINGS ====================
 
 export async function getStoreSettings(uid?: string): Promise<StoreSettings> {
-  const targetUid = uid || getUid();
+  const targetUid = uid || getCurrentUid();
   const defaultSettings: StoreSettings = {
     storeName: 'My Kirana Store',
     address: 'Main Market, Kirana Bazaar',
@@ -101,17 +105,23 @@ export async function getStoreSettings(uid?: string): Promise<StoreSettings> {
     gstin: '',
   };
 
+  if (!targetUid) {
+    return defaultSettings;
+  }
+
   try {
     const ref = doc(db, 'stores', targetUid, 'settings', 'profile');
     const snap = await getDoc(ref);
     if (snap.exists()) {
       return { ...defaultSettings, ...snap.data() } as StoreSettings;
     }
-    // Initialize if absent
-    await setDoc(ref, defaultSettings);
+    // Initialize if absent (only if currently authenticated)
+    if (auth.currentUser) {
+      await setDoc(ref, defaultSettings);
+    }
     return defaultSettings;
   } catch (err) {
-    console.error('Error getting store settings:', err);
+    console.warn('Unable to load store settings from Firestore, using defaults:', err);
     return defaultSettings;
   }
 }
@@ -146,6 +156,7 @@ const DEFAULT_STARTER_PRODUCTS: Omit<Product, 'id' | 'userId' | 'createdAt' | 'u
 ];
 
 export async function seedStarterProductsIfEmpty(uid: string): Promise<void> {
+  if (!uid || !auth.currentUser) return;
   try {
     const productsRef = collection(db, 'stores', uid, 'products');
     const snap = await getDocs(productsRef);
@@ -166,48 +177,55 @@ export async function seedStarterProductsIfEmpty(uid: string): Promise<void> {
       await batch.commit();
     }
   } catch (err) {
-    console.error('Error seeding starter products:', err);
+    console.warn('Non-blocking starter product seeding notice:', err);
   }
 }
 
 // ==================== PRODUCTS ====================
 
 export async function getProducts(params?: { search?: string; category?: string; filter?: string }): Promise<Product[]> {
-  const uid = getUid();
-  const productsRef = collection(db, 'stores', uid, 'products');
-  const snap = await getDocs(productsRef);
-  let list = snap.docs.map((d) => d.data() as Product);
+  const uid = getCurrentUid();
+  if (!uid) return [];
 
-  // If newly created user with no products, seed starter products
-  if (list.length === 0 && !params?.search && !params?.category) {
-    await seedStarterProductsIfEmpty(uid);
-    const refreshedSnap = await getDocs(productsRef);
-    list = refreshedSnap.docs.map((d) => d.data() as Product);
+  try {
+    const productsRef = collection(db, 'stores', uid, 'products');
+    const snap = await getDocs(productsRef);
+    let list = snap.docs.map((d) => d.data() as Product);
+
+    // If newly created user with no products, seed starter products
+    if (list.length === 0 && !params?.search && !params?.category) {
+      await seedStarterProductsIfEmpty(uid);
+      const refreshedSnap = await getDocs(productsRef);
+      list = refreshedSnap.docs.map((d) => d.data() as Product);
+    }
+
+    // Filter in memory for maximum search flexibility
+    if (params?.search) {
+      const s = params.search.toLowerCase().trim();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(s) ||
+          (p.barcode && p.barcode.includes(s)) ||
+          (p.brand && p.brand.toLowerCase().includes(s))
+      );
+    }
+
+    if (params?.category && params.category !== 'All') {
+      list = list.filter((p) => p.category === params.category);
+    }
+
+    if (params?.filter === 'low_stock') {
+      list = list.filter((p) => p.currentStock <= p.minStock && p.currentStock > 0);
+    } else if (params?.filter === 'out_of_stock') {
+      list = list.filter((p) => p.currentStock <= 0);
+    }
+
+    list.sort((a, b) => a.name.localeCompare(b.name));
+    return list;
+  } catch (err) {
+    console.warn('Unable to load products from Firestore:', err);
+    return [];
   }
-
-  // Filter in memory for maximum search flexibility
-  if (params?.search) {
-    const s = params.search.toLowerCase().trim();
-    list = list.filter(
-      (p) =>
-        p.name.toLowerCase().includes(s) ||
-        (p.barcode && p.barcode.includes(s)) ||
-        (p.brand && p.brand.toLowerCase().includes(s))
-    );
-  }
-
-  if (params?.category && params.category !== 'All') {
-    list = list.filter((p) => p.category === params.category);
-  }
-
-  if (params?.filter === 'low_stock') {
-    list = list.filter((p) => p.currentStock <= p.minStock && p.currentStock > 0);
-  } else if (params?.filter === 'out_of_stock') {
-    list = list.filter((p) => p.currentStock <= 0);
-  }
-
-  list.sort((a, b) => a.name.localeCompare(b.name));
-  return list;
 }
 
 export async function createProduct(data: Omit<Product, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<Product> {
@@ -267,12 +285,18 @@ export async function deleteProduct(id: string): Promise<void> {
 // ==================== SALES ====================
 
 export async function getSales(): Promise<Sale[]> {
-  const uid = getUid();
-  const ref = collection(db, 'stores', uid, 'sales');
-  const snap = await getDocs(ref);
-  const sales = snap.docs.map((d) => d.data() as Sale);
-  sales.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
-  return sales;
+  const uid = getCurrentUid();
+  if (!uid) return [];
+  try {
+    const ref = collection(db, 'stores', uid, 'sales');
+    const snap = await getDocs(ref);
+    const sales = snap.docs.map((d) => d.data() as Sale);
+    sales.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+    return sales;
+  } catch (err) {
+    console.warn('Unable to load sales from Firestore:', err);
+    return [];
+  }
 }
 
 export async function getSaleById(id: string): Promise<Sale | null> {
@@ -393,12 +417,18 @@ export async function createSale(data: {
 // ==================== PURCHASES ====================
 
 export async function getPurchases(): Promise<Purchase[]> {
-  const uid = getUid();
-  const ref = collection(db, 'stores', uid, 'purchases');
-  const snap = await getDocs(ref);
-  const purchases = snap.docs.map((d) => d.data() as Purchase);
-  purchases.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
-  return purchases;
+  const uid = getCurrentUid();
+  if (!uid) return [];
+  try {
+    const ref = collection(db, 'stores', uid, 'purchases');
+    const snap = await getDocs(ref);
+    const purchases = snap.docs.map((d) => d.data() as Purchase);
+    purchases.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+    return purchases;
+  } catch (err) {
+    console.warn('Unable to load purchases from Firestore:', err);
+    return [];
+  }
 }
 
 export async function createPurchase(data: {
@@ -500,12 +530,18 @@ export async function createPurchase(data: {
 // ==================== CUSTOMERS ====================
 
 export async function getCustomers(): Promise<Customer[]> {
-  const uid = getUid();
-  const ref = collection(db, 'stores', uid, 'customers');
-  const snap = await getDocs(ref);
-  const customers = snap.docs.map((d) => d.data() as Customer);
-  customers.sort((a, b) => a.name.localeCompare(b.name));
-  return customers;
+  const uid = getCurrentUid();
+  if (!uid) return [];
+  try {
+    const ref = collection(db, 'stores', uid, 'customers');
+    const snap = await getDocs(ref);
+    const customers = snap.docs.map((d) => d.data() as Customer);
+    customers.sort((a, b) => a.name.localeCompare(b.name));
+    return customers;
+  } catch (err) {
+    console.warn('Unable to load customers from Firestore:', err);
+    return [];
+  }
 }
 
 export async function createCustomer(data: Omit<Customer, 'id' | 'userId' | 'createdAt'>): Promise<Customer> {
@@ -641,12 +677,18 @@ export async function addCustomerCredit(id: string, body: { amount: number; note
 // ==================== SUPPLIERS ====================
 
 export async function getSuppliers(): Promise<Supplier[]> {
-  const uid = getUid();
-  const ref = collection(db, 'stores', uid, 'suppliers');
-  const snap = await getDocs(ref);
-  const suppliers = snap.docs.map((d) => d.data() as Supplier);
-  suppliers.sort((a, b) => a.name.localeCompare(b.name));
-  return suppliers;
+  const uid = getCurrentUid();
+  if (!uid) return [];
+  try {
+    const ref = collection(db, 'stores', uid, 'suppliers');
+    const snap = await getDocs(ref);
+    const suppliers = snap.docs.map((d) => d.data() as Supplier);
+    suppliers.sort((a, b) => a.name.localeCompare(b.name));
+    return suppliers;
+  } catch (err) {
+    console.warn('Unable to load suppliers from Firestore:', err);
+    return [];
+  }
 }
 
 export async function createSupplier(data: Omit<Supplier, 'id' | 'userId' | 'createdAt'>): Promise<Supplier> {
@@ -741,28 +783,40 @@ export async function addSupplierPayment(id: string, body: { amount: number; not
 // ==================== UDHAAR & KHATA ====================
 
 export async function getUdhaarTransactions(partyType?: string): Promise<UdhaarTransaction[]> {
-  const uid = getUid();
-  const ref = collection(db, 'stores', uid, 'creditTransactions');
-  const snap = await getDocs(ref);
-  let list = snap.docs.map((d) => d.data() as UdhaarTransaction);
+  const uid = getCurrentUid();
+  if (!uid) return [];
+  try {
+    const ref = collection(db, 'stores', uid, 'creditTransactions');
+    const snap = await getDocs(ref);
+    let list = snap.docs.map((d) => d.data() as UdhaarTransaction);
 
-  if (partyType) {
-    list = list.filter((t) => t.partyType === partyType);
+    if (partyType) {
+      list = list.filter((t) => t.partyType === partyType);
+    }
+
+    list.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+    return list;
+  } catch (err) {
+    console.warn('Unable to load udhaar transactions from Firestore:', err);
+    return [];
   }
-
-  list.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
-  return list;
 }
 
 // ==================== EXPENSES ====================
 
 export async function getExpenses(): Promise<Expense[]> {
-  const uid = getUid();
-  const ref = collection(db, 'stores', uid, 'expenses');
-  const snap = await getDocs(ref);
-  const list = snap.docs.map((d) => d.data() as Expense);
-  list.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
-  return list;
+  const uid = getCurrentUid();
+  if (!uid) return [];
+  try {
+    const ref = collection(db, 'stores', uid, 'expenses');
+    const snap = await getDocs(ref);
+    const list = snap.docs.map((d) => d.data() as Expense);
+    list.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+    return list;
+  } catch (err) {
+    console.warn('Unable to load expenses from Firestore:', err);
+    return [];
+  }
 }
 
 export async function createExpense(data: { category: string; amount: number; date?: string; notes?: string }): Promise<Expense> {
@@ -794,16 +848,36 @@ export async function deleteExpense(id: string): Promise<void> {
 // ==================== DASHBOARD STATS ====================
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const uid = getUid();
+  const defaultEmptyStats: DashboardStats = {
+    todaySales: 0,
+    todayPurchases: 0,
+    todayGrossProfit: 0,
+    todayExpenses: 0,
+    todayProfit: 0,
+    totalProducts: 0,
+    lowStockProducts: 0,
+    outOfStockProducts: 0,
+    stockValue: 0,
+    totalCustomers: 0,
+    pendingPayments: 0,
+    supplierPayables: 0,
+    recentTransactions: [],
+  };
 
-  const [products, sales, purchases, customers, suppliers, expenses] = await Promise.all([
-    getProducts(),
-    getSales(),
-    getPurchases(),
-    getCustomers(),
-    getSuppliers(),
-    getExpenses(),
-  ]);
+  const uid = getCurrentUid();
+  if (!uid) {
+    return defaultEmptyStats;
+  }
+
+  try {
+    const [products, sales, purchases, customers, suppliers, expenses] = await Promise.all([
+      getProducts(),
+      getSales(),
+      getPurchases(),
+      getCustomers(),
+      getSuppliers(),
+      getExpenses(),
+    ]);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -888,19 +962,46 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     supplierPayables,
     recentTransactions: recentTransactions.slice(0, 8),
   };
+  } catch (err) {
+    console.warn('Unable to load dashboard stats from Firestore:', err);
+    return defaultEmptyStats;
+  }
 }
 
 // ==================== REPORTS DATA ====================
 
 export async function getReportsData(): Promise<ReportsData> {
-  const [products, sales, purchases, customers, suppliers, expenses] = await Promise.all([
-    getProducts(),
-    getSales(),
-    getPurchases(),
-    getCustomers(),
-    getSuppliers(),
-    getExpenses(),
-  ]);
+  const defaultReports: ReportsData = {
+    summary: {
+      totalSalesRevenue: 0,
+      totalPurchasesCost: 0,
+      totalGrossProfit: 0,
+      totalExpenses: 0,
+      totalNetProfit: 0,
+      totalOrders: 0,
+    },
+    dailyTrend: [],
+    bestSellingProducts: [],
+    lowStockList: [],
+    topDebtors: [],
+    topPayables: [],
+    expensesByCategory: [],
+  };
+
+  const uid = getCurrentUid();
+  if (!uid) {
+    return defaultReports;
+  }
+
+  try {
+    const [products, sales, purchases, customers, suppliers, expenses] = await Promise.all([
+      getProducts(),
+      getSales(),
+      getPurchases(),
+      getCustomers(),
+      getSuppliers(),
+      getExpenses(),
+    ]);
 
   const totalSalesRevenue = sales.reduce((sum, s) => sum + (s.grandTotal || 0), 0);
   const totalPurchasesCost = purchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
@@ -989,22 +1090,26 @@ export async function getReportsData(): Promise<ReportsData> {
     amount,
   }));
 
-  return {
-    summary: {
-      totalSalesRevenue,
-      totalPurchasesCost,
-      totalGrossProfit,
-      totalExpenses,
-      totalNetProfit,
-      totalOrders: sales.length,
-    },
-    dailyTrend,
-    bestSellingProducts,
-    lowStockList,
-    topDebtors,
-    topPayables,
-    expensesByCategory,
-  };
+    return {
+      summary: {
+        totalSalesRevenue,
+        totalPurchasesCost,
+        totalGrossProfit,
+        totalExpenses,
+        totalNetProfit,
+        totalOrders: sales.length,
+      },
+      dailyTrend,
+      bestSellingProducts,
+      lowStockList,
+      topDebtors,
+      topPayables,
+      expensesByCategory,
+    };
+  } catch (err) {
+    console.warn('Unable to load reports data from Firestore:', err);
+    return defaultReports;
+  }
 }
 
 // ==================== ADMIN OPERATIONS ====================

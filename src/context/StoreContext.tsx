@@ -28,7 +28,7 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, firebaseUser } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -49,47 +49,47 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const refreshProducts = useCallback(async () => {
-    if (!user) return;
+    if (!user || !firebaseUser) return;
     try {
       const data = await api.getProducts();
       setProducts(data);
     } catch (err: any) {
-      console.error('Failed to load products', err);
+      console.warn('Could not refresh products:', err);
     }
-  }, [user]);
+  }, [user, firebaseUser]);
 
   const refreshCustomers = useCallback(async () => {
-    if (!user) return;
+    if (!user || !firebaseUser) return;
     try {
       const data = await api.getCustomers();
       setCustomers(data);
     } catch (err: any) {
-      console.error('Failed to load customers', err);
+      console.warn('Could not refresh customers:', err);
     }
-  }, [user]);
+  }, [user, firebaseUser]);
 
   const refreshSuppliers = useCallback(async () => {
-    if (!user) return;
+    if (!user || !firebaseUser) return;
     try {
       const data = await api.getSuppliers();
       setSuppliers(data);
     } catch (err: any) {
-      console.error('Failed to load suppliers', err);
+      console.warn('Could not refresh suppliers:', err);
     }
-  }, [user]);
+  }, [user, firebaseUser]);
 
   const refreshDashboard = useCallback(async () => {
-    if (!user) return;
+    if (!user || !firebaseUser) return;
     try {
       const data = await api.getDashboard();
       setDashboardStats(data);
     } catch (err: any) {
-      console.error('Failed to load dashboard stats', err);
+      console.warn('Could not refresh dashboard stats:', err);
     }
-  }, [user]);
+  }, [user, firebaseUser]);
 
   const refreshAll = useCallback(async () => {
-    if (!user) return;
+    if (!user || !firebaseUser) return;
     setLoading(true);
     try {
       await Promise.all([
@@ -101,10 +101,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setLoading(false);
     }
-  }, [user, refreshProducts, refreshCustomers, refreshSuppliers, refreshDashboard]);
+  }, [user, firebaseUser, refreshProducts, refreshCustomers, refreshSuppliers, refreshDashboard]);
 
   useEffect(() => {
-    if (user) {
+    if (user && firebaseUser) {
       refreshAll();
     } else {
       setProducts([]);
@@ -112,7 +112,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setSuppliers([]);
       setDashboardStats(null);
     }
-  }, [user, refreshAll]);
+  }, [user, firebaseUser, refreshAll]);
 
   return (
     <StoreContext.Provider
